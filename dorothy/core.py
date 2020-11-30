@@ -145,7 +145,8 @@ def setup_elasticsearch_client(okta_url):
     if click.confirm("[*] Do you want to index Dorothy's logs in Elasticsearch?", default=False):
         es_url = click.prompt("[*] Enter your Elasticsearch URL")
         es_username = click.prompt("[*] Enter your Elasticsearch username")
-        es_password = click.prompt("[*] Enter your Elasticsearch password", hide_input=True)
+        es_password = click.prompt("[*] Enter your Elasticsearch password. The input for this value is hidden",
+                                   hide_input=True)
         es_client = Elasticsearch([es_url], http_auth=(es_username, es_password), scheme="https")
 
         event = f"Dorothy started using URL {okta_url}"
