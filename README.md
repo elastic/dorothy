@@ -30,7 +30,7 @@ Head on over to the [wiki](https://github.com/elastic/dorothy/wiki) for help ins
 
 ## Questions? Problems? Suggestions?
 
-Reach out in the **#security** channel in [Elastic's Community Slack workspace](https://ela.st) or open an issue in this repo.
+Reach out in the **#security** channel in [Elastic's Community Slack workspace](https://ela.st/slack) or open an issue in this repo.
 
 ## Contributors
 
