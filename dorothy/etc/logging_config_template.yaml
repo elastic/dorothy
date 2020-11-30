@@ -1,0 +1,32 @@
+version: 1
+# The logger was getting disabled by another library/module. This key is set to False to prevent this from happening
+disable_existing_loggers: False
+formatters:
+  simple:
+    format: '%(asctime)s | %(levelname)s | %(name)s | %(funcName)s | %(message)s'
+    datefmt: '%d-%b-%y %H:%M:%S %Z'
+handlers:
+  console:
+    class: logging.StreamHandler
+    # Log events with a severity of WARNING or above (INFO and DEBUG won't be logged to the console)
+    level: WARNING
+    formatter: simple
+    stream: ext://sys.stdout
+  file:
+    # The log file will rotate when the max file size is reached
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: 'dorothy.log'
+    maxBytes: 2097152 # 2MB
+    # A maximum of 3 log files will be stored on disk
+    backupCount: 2
+  #loggers:
+  #  logger:
+  #    level: DEBUG
+  #    handlers: [console, file]
+  #    propagate: no
+root:
+  level: DEBUG
+  # Amend the following line to "handlers: [console, file]" to log errors to the console too
+  handlers: [file]
