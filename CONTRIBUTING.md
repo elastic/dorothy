@@ -24,7 +24,7 @@ When opening an issue, please provide as much detail as possible and remember to
 
 ### Branching
 
-* All changes for the next release of Dorothy are made to the `tap-heels-together` branch
+* All changes for the next release of Dorothy are made to the `main` branch
 
 ### Commit messages
 
@@ -42,7 +42,7 @@ When opening an issue, please provide as much detail as possible and remember to
 
 Push your local changes to your forked copy of the repository and submit a pull request. In the pull request, describe what your changes do and mention the number of the issue where discussion has taken place. E.g. "Closes #123".
 
-Always submit your pull against `tap-heels-together` . See [Branching](#branching) for our branching strategy.
+Always submit your pull against `main` . See [Branching](#branching) for our branching strategy.
 
 ### What to expect from a code review
 
