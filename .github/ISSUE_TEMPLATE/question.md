@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-If you have a question and prefer a more synchronous method of communication, reach out to us in the **#security** channel in [Elastic's Community Slack workspace](https://ela.st/slack).
+Feel free to reach out in the **#security** channel in [Elastic's Community Slack workspace](https://ela.st/slack). If you prefer asynchronous communication, feel free to open an issue.
 
 **Question**
 Please include as much detail as possible
