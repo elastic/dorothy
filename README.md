@@ -1,5 +1,5 @@
 ![Supported Python Versions](https://img.shields.io/badge/Supported%20Python%20Versions-3.7%2B-yellow)
-![Python Package](https://github.com/elastic/dorothy/workflows/Python%20package/badge.svg)
+[![Unit Tests](https://github.com/elastic/dorothy/workflows/Unit%20Tests/badge.svg)](https://github.com/elastic/dorothy/actions)
 [![Chat](https://img.shields.io/badge/chat-%23elastic--security-blueviolet)](https://ela.st/slack)
 [![PyPI](https://img.shields.io/pypi/v/dorothy?label=PyPI)](https://pypi.org/project/dorothy/)
 
