@@ -1,8 +1,8 @@
 ## Issues
-<!-- Link to related issues. Use closing keywords when appropriate. E.g. Resolves #1 or Fixes #1 or Closes #1 -->
+<!-- Link to related issues. Use closing keywords when appropriate. https://docs.github.com/articles/closing-issues-using-keywords -->
 
 ## Summary
-
+<!-- Include a summary of what this pull request includes -->
 
 ## Contributor checklist
 
