@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a bug or issue for Dorothy
+about: Report a bug with Dorothy
 title: "[BUG] "
 labels: bug
 assignees: ''
