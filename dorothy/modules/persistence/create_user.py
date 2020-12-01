@@ -96,8 +96,9 @@ def execute(ctx):
     if error:
         return
 
-    password = click.prompt("[*] Enter a password for the new user. The input for this value is hidden",
-                            hide_input=True)
+    password = click.prompt(
+        "[*] Enter a password for the new user. The input for this value is hidden", hide_input=True
+    )
 
     msg = f'Attempting to create new Okta user {MODULE_OPTIONS["login"]["value"]}'
     LOGGER.info(msg)
