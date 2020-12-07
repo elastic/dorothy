@@ -3,7 +3,7 @@
 [![Chat](https://img.shields.io/badge/chat-%23elastic--security-blueviolet)](https://ela.st/slack)
 [![PyPI](https://img.shields.io/pypi/v/dorothy?label=PyPI)](https://pypi.org/project/dorothy/)
 
-![Dorothy](.github/images/github-header-dorothy-moo-1500x454.png)
+![](https://github.com/elastic/dorothy/.github/images/github-header-dorothy-moo-1500x454.png)
 
 Created by David French ([@threatpunter](https://twitter.com/threatpunter)) at [Elastic Security](https://www.elastic.co/security)
 
@@ -13,7 +13,7 @@ Dorothy is a tool to help security teams test their monitoring and detection cap
 
 Dorothy can change the configuration of your Okta environment. Consider using Dorothy in a test environment to avoid any risk of impacting your production environment.
 
-![Dorothy](.github/images/dorothy_01.png)
+![](https://github.com/elastic/dorothy/.github/images/dorothy_01.png)
 
 ## Table of Contents
 - [Getting Started](#getting-started)
