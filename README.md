@@ -3,7 +3,7 @@
 [![Chat](https://img.shields.io/badge/chat-%23elastic--security-blueviolet)](https://ela.st/slack)
 [![PyPI](https://img.shields.io/pypi/v/dorothy?label=PyPI)](https://pypi.org/project/dorothy/)
 
-![Dorothy](.github/images/github-header-dorothy-1500x454.png)
+![Dorothy](.github/images/github-header-dorothy-moo-1500x454.png)
 
 Created by David French ([@threatpunter](https://twitter.com/threatpunter)) at [Elastic Security](https://www.elastic.co/security)
 
