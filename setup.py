@@ -22,16 +22,24 @@
 import re
 import io
 from setuptools import find_namespace_packages, setup
+import pathlib
 
 with io.open("dorothy/__init__.py", "rt", encoding="utf8") as f:
     __version__ = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
+CWD = pathlib.Path(__file__).parent
+
+README = (CWD / "README.md").read_text()
 
 setup(
     name="dorothy",
     version=__version__,
     description="Dorothy is a tool to test security monitoring and detection for Okta environments",
+    long_description=README,
+    long_description_content_type="text/markdown",
+    url="https://github.com/elastic/dorothy",
     author="David French",
+    author_email="threatpunter@gmail.com",
     maintainer="Elastic",
     license="Apache License 2.0",
     classifiers=[
