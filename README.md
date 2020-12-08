@@ -13,7 +13,7 @@ Dorothy is a tool to help security teams test their monitoring and detection cap
 
 Dorothy can change the configuration of your Okta environment. Consider using Dorothy in a test environment to avoid any risk of impacting your production environment.
 
-![Dorothy](https://github.com/elastic/dorothy/blob/main/.github/images/dorothy_01.png?raw=true)
+![Dorothy](https://raw.githubusercontent.com/elastic/dorothy/main/.github/images/whoami.gif?raw=true)
 
 ## Table of Contents
 - [Getting Started](#getting-started)
