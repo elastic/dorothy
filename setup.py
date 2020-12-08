@@ -57,7 +57,7 @@ setup(
     install_requires=open("requirements.txt", "r").read(),
     entry_points={
         "console_scripts": [
-            "dorothy=dorothy.main:main",  # this registers a command line tool "dorothy"
+            "dorothy=dorothy.main:dorothy_shell",  # this registers a command line tool "dorothy"
         ],
     },
 )
