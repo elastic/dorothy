@@ -25,7 +25,15 @@ from pathlib import Path
 
 import click
 
-from dorothy.core import write_json_file, load_json_file, list_assigned_roles, list_users, print_role_info, index_event
+from dorothy.core import (
+    OktaUser,
+    write_json_file,
+    load_json_file,
+    list_users,
+    print_role_info,
+    index_event,
+    list_assigned_roles,
+)
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -121,19 +129,20 @@ def check_assigned_roles(ctx, users):
 
     # Don't put print statements under click.progressbar otherwise the progress bar will be interrupted
     with click.progressbar(users, label="[*] Checking users for admin roles") as users:
-        for user in users:
-            assigned_roles, error = list_assigned_roles(ctx, user.get("id"), object_type="user", mute=True)
+        for okta_user in users:
+            user = OktaUser(okta_user)
+            assigned_roles, error = list_assigned_roles(ctx, user.obj["id"], object_type="user", mute=True)
             # Stop trying to check roles if the current API token doesn't have that permission
             if error:
                 return
 
             if assigned_roles:
-                admin_user = {"user": user, "roles": assigned_roles}
+                admin_user = {"user": user.obj, "roles": assigned_roles}
                 admin_users.append(admin_user)
 
                 for role in assigned_roles:
                     if role["type"] in ctx.obj.admin_roles:
-                        msg = f'User ID {user["id"]} has admin role {role["type"]} assigned'
+                        msg = f'User ID {user.obj["id"]} has admin role {role["type"]} assigned'
                         LOGGER.info(msg)
                         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
 

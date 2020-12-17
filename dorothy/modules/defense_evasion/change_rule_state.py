@@ -24,10 +24,7 @@ import logging.config
 import click
 
 from dorothy.core import (
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
+    Module,
     get_policy_rule,
     set_policy_rule_state,
     index_event,
@@ -42,6 +39,7 @@ MODULE_OPTIONS = {
     "policy_id": {"value": None, "required": True, "help": "The unique ID for the policy"},
     "rule_id": {"value": None, "required": True, "help": "The unique ID for the policy rule"},
 }
+MODULE = Module(MODULE_OPTIONS)
 
 
 @defense_evasion.subshell(name="change-rule-state")
@@ -58,7 +56,7 @@ def change_rule_state(ctx):
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @change_rule_state.command()
@@ -68,20 +66,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @change_rule_state.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @change_rule_state.command()
@@ -89,7 +81,7 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return

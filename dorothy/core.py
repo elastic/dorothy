@@ -25,6 +25,7 @@ import logging.config
 import time
 from datetime import datetime
 from importlib import import_module
+from dataclasses import dataclass
 
 import click
 import requests
@@ -35,6 +36,125 @@ from tabulate import tabulate
 
 LOGGER = logging.getLogger(__name__)
 URL_OR_API_TOKEN_ERROR = "ERROR. Verify that the Okta URL and API token in your configuration profile are correct"
+
+
+@dataclass
+class Module:
+    module_options: dict
+
+    def print_info(self):
+        """Print the module's available options and current values"""
+
+        # Print module options in table format
+        headers = ["Option", "Value", "Required", "Description"]
+        options = [(k.replace("_", "-"), v["value"], v["required"], v["help"]) for k, v in self.module_options.items()]
+        click.echo(tabulate(options, headers=headers, tablefmt="pretty"))
+
+    def set_options(self, ctx, new_options):
+        """Set one or more options for a module"""
+
+        if all(value is None for value in new_options.values()):
+            return click.echo(ctx.get_help())
+
+        for k, v in new_options.items():
+            # Split the provided group id values into a list
+            if k == "group_ids" and v:
+                v = list(v.strip().split(","))
+                self.module_options[k]["value"] = v
+            # Only set the option's value if the user entered one to avoid overwriting previous settings
+            elif v:
+                self.module_options[k]["value"] = v.strip()
+            else:
+                pass
+
+        return self.module_options
+
+    def reset_options(self):
+        """Reset all options for a module"""
+        for k, v in self.module_options.items():
+            v["value"] = None
+
+        return self.module_options
+
+    def check_options(self):
+        """Check a module's configured options for issues"""
+
+        # Check for any required options that are missing
+        for k, v in self.module_options.items():
+            if v["required"] is True and not v.get("value"):
+                click.secho(
+                    f'[!] Unable to execute module. Required value not set: {k.replace("_", "-")}. '
+                    f"Set required value and try again",
+                    fg="red",
+                )
+                error = True
+                return error
+            else:
+                error = False
+                return error
+
+
+@dataclass
+class OktaUser:
+    # Okta user object
+    obj: dict
+
+    def print_info(self):
+        """Print basic info for Okta user"""
+
+        click.echo(f'[*] User information for ID {self.obj.get("id")}, login {self.obj["profile"].get("login")}:')
+        click.echo(
+            f'    ID: {self.obj.get("id", "unknown")}\n'
+            f'    Status: {self.obj.get("status", "unknown")}\n'
+            f'    Login: {self.obj["profile"].get("login", "unknown")}\n'
+            f'    Last login: {self.obj.get("lastLogin", "unknown")}\n'
+            f'    Last password change: {self.obj.get("passwordChanged", "unknown")}'
+        )
+
+    def get_groups(self, ctx):
+        """Fetch the groups of which the user is a member"""
+
+        payload = {}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        url = f"{ctx.obj.base_url}/users/{self.obj['id']}/groups"
+
+        msg = f"Attempting to get group memberships for user ID {self.obj['id']}"
+        LOGGER.info(msg)
+        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+        click.echo(f"[*] {msg}")
+
+        try:
+            response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if not response.ok:
+            msg = (
+                f"""Error retrieving user's group memberships\n"""
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+            return
+
+        groups = []
+
+        if response.ok:
+            groups = response.json()
+
+        if groups:
+            click.echo(f"[*] Group memberships for user ID {self.obj['id']}:")
+            print_group_information(groups)
 
 
 def list_modules(obj):
@@ -78,7 +198,7 @@ def whoami(ctx):
 
     user = get_current_user(ctx)
     if user:
-        list_assigned_roles(ctx, user.get("id"), object_type="user")
+        list_assigned_roles(ctx, user.obj.get("id"), object_type="user")
     else:
         msg = """Unable to list current user's assigned roles. No user object found"""
         LOGGER.error(msg)
@@ -86,7 +206,7 @@ def whoami(ctx):
         click.secho(f"[!] {msg}", fg="red")
 
     if user:
-        get_user_groups(ctx, user.get("id"))
+        user.get_groups(ctx)
     else:
         msg = """Unable to list current user's group memberships. No user object found"""
         LOGGER.error(msg)
@@ -181,19 +301,6 @@ def index_event(es, module, event_type, event):
             )
 
 
-def print_user_info(user):
-    """Print basic info for Okta user"""
-
-    click.echo(f'[*] User information for ID {user.get("id")}, login {user["profile"].get("login")}:')
-    click.echo(
-        f'    ID: {user.get("id", "unknown")}\n'
-        f'    Status: {user.get("status", "unknown")}\n'
-        f'    Login: {user["profile"].get("login", "unknown")}\n'
-        f'    Last login: {user.get("lastLogin", "unknown")}\n'
-        f'    Last password change: {user.get("passwordChanged", "unknown")}'
-    )
-
-
 def get_current_user(ctx):
     """Fetch the user linked to the current API token"""
 
@@ -225,8 +332,8 @@ def get_current_user(ctx):
         return
 
     if response.ok:
-        user = response.json()
-        print_user_info(user)
+        user = OktaUser(response.json())
+        user.print_info()
         return user
 
 
@@ -260,14 +367,13 @@ def get_user_object(ctx, user_id):
         index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
         click.secho(f"[!] {msg}", fg="red")
         click.echo("[*] This error is expected if the user object was deleted")
-        error = True
-        return error
+        user = None
+        return user
 
     if response.ok:
-        user = response.json()
-        print_user_info(user)
-        error = False
-        return error
+        user = OktaUser(response.json())
+        user.print_info()
+        return user
 
 
 def list_assigned_roles(ctx, unique_id, object_type, mute=False):
@@ -354,52 +460,6 @@ def print_role_info(unique_id, roles, object_type):
         )
 
 
-def get_user_groups(ctx, user_id):
-    """Fetch the groups of which the user is a member"""
-
-    payload = {}
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    url = f"{ctx.obj.base_url}/users/{user_id}/groups"
-
-    msg = f"Attempting to get group memberships for user ID {user_id}"
-    LOGGER.info(msg)
-    index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-    click.echo(f"[*] {msg}")
-
-    try:
-        response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if not response.ok:
-        msg = (
-            f"""Error retrieving user's group memberships\n"""
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-        return
-
-    groups = []
-
-    if response.ok:
-        groups = response.json()
-
-    if groups:
-        click.echo(f"[*] Group memberships for user ID {user_id}:")
-        print_group_information(groups)
-
-
 def print_group_information(groups):
     """Print basic info for Okta user groups"""
 
@@ -478,8 +538,9 @@ def list_users(ctx, query=None, search_filter=None, search=None):
         click.echo(f"[*] {msg}")
 
         if click.confirm("[*] Do you want to print harvested user information?", default=True):
-            for user in harvested_users:
-                print_user_info(user)
+            for okta_user in harvested_users:
+                user = OktaUser(okta_user)
+                user.print_info()
 
         if click.confirm("[*] Do you want to save harvested user information to a file?", default=True):
             file_path = f"{ctx.obj.data_dir}/{ctx.obj.profile_id}_harvested_users"
@@ -610,58 +671,6 @@ def assign_admin_role(ctx, id, role_type, target):
         )
 
         return
-
-
-def print_module_info(module_options):
-    """Print a module's available options and current values"""
-
-    # Print module options in table format
-    headers = ["Option", "Value", "Required", "Description"]
-    options = [(k.replace("_", "-"), v["value"], v["required"], v["help"]) for k, v in module_options.items()]
-    click.echo(tabulate(options, headers=headers, tablefmt="pretty"))
-
-
-def set_module_options(module_options, new_options):
-    """Set one or more options for a module"""
-
-    for k, v in new_options.items():
-        # Split the provided group id values into a list
-        if k == "group_ids" and v:
-            v = list(v.strip().split(","))
-            module_options[k]["value"] = v
-        # Only set the option's value if the user entered one to avoid overwriting previous settings
-        elif v:
-            module_options[k]["value"] = v.strip()
-        else:
-            pass
-
-    return module_options
-
-
-def reset_module_options(module_options):
-    """Reset all options for a module"""
-    for k, v in module_options.items():
-        v["value"] = None
-
-    return module_options
-
-
-def check_module_options(module_options):
-    """Check a module's configured options for issues"""
-
-    # Check for any required options that are missing
-    for k, v in module_options.items():
-        if v["required"] is True and not v.get("value"):
-            click.secho(
-                f'[!] Unable to execute module. Required value not set: {k.replace("_", "-")}. '
-                f"Set required value and try again",
-                fg="red",
-            )
-            error = True
-            return error
-        else:
-            error = False
-            return error
 
 
 def setup_session_instance(url):

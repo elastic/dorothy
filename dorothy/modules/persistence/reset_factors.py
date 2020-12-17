@@ -20,16 +20,12 @@
 # Reset all MFA factors for an Okta user
 
 import logging.config
-from textwrap import dedent
 
 import click
 
 from dorothy.core import (
+    Module,
     get_user_object,
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
     index_event,
 )
 from dorothy.modules.persistence.persistence import persistence
@@ -40,6 +36,7 @@ TACTICS = ["Persistence"]
 URL_OR_API_TOKEN_ERROR = "ERROR. Verify that the Okta URL and API token in your configuration profile are correct"
 
 MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID for the user"}}
+MODULE = Module(MODULE_OPTIONS)
 
 
 @persistence.subshell(name="reset-factors")
@@ -55,7 +52,7 @@ def reset_factors(ctx):
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @reset_factors.command()
@@ -64,20 +61,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @reset_factors.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @reset_factors.command()
@@ -85,7 +76,7 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return

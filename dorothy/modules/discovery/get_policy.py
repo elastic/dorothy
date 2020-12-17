@@ -20,17 +20,13 @@
 # Get an Okta policy and its rules
 
 import logging.config
-from textwrap import dedent
 
 import click
 
 from dorothy.core import (
+    Module,
     get_policy_object,
     print_policy_object,
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
     write_json_file,
     index_event,
 )
@@ -41,6 +37,7 @@ MODULE_DESCRIPTION = "Get an Okta policy and its rules"
 TACTICS = ["Discovery"]
 
 MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID for policy"}}
+MODULE = Module(MODULE_OPTIONS)
 
 
 @discovery.subshell(name="get-policy")
@@ -54,7 +51,7 @@ def get_policy():
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @get_policy.command()
@@ -63,20 +60,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @get_policy.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @get_policy.command()
@@ -84,7 +75,7 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return
