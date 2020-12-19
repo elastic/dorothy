@@ -26,8 +26,7 @@ from tabulate import tabulate
 
 from dorothy.core import (
     Module,
-    list_enrolled_factors,
-    reset_factor,
+    OktaUser,
     index_event,
 )
 from dorothy.modules.persistence.persistence import persistence
@@ -83,22 +82,21 @@ def execute(ctx):
     if error:
         return
 
-    user_id = MODULE_OPTIONS["id"]["value"]
-
-    enrolled_factors, error = list_enrolled_factors(ctx, user_id)
+    user = OktaUser({"id": MODULE_OPTIONS["id"]["value"]})
+    enrolled_factors, error = user.list_enrolled_factors(ctx)
 
     if error:
         return
 
     if not enrolled_factors:
-        msg = f"No enrolled MFA factors found for user {user_id}"
+        msg = f'No enrolled MFA factors found for user {user.obj["id"]}'
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.echo(f"[*] {msg}")
         return
 
     else:
-        msg = f"Found {len(enrolled_factors)} enrolled MFA factors for user {user_id}"
+        msg = f'Found {len(enrolled_factors)} enrolled MFA factors for user {user.obj["id"]}'
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
@@ -127,7 +125,7 @@ def execute(ctx):
 
                 if (choice > 0) and (choice <= len(factors)):
                     factor_id = enrolled_factors[choice - 1]["id"]
-                    reset_factor(ctx, user_id, factor_id)
+                    user.reset_factor(ctx, factor_id)
                     return
                 else:
                     click.secho("[!] Invalid choice", fg="red")

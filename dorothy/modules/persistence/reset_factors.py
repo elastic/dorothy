@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_user_object,
     index_event,
 )
 from dorothy.modules.persistence.persistence import persistence
@@ -111,7 +110,7 @@ def execute(ctx):
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
 
-        get_user_object(ctx, MODULE_OPTIONS["id"]["value"])
+        ctx.obj.okta.get_user(ctx, MODULE_OPTIONS["id"]["value"])
 
     else:
         msg = (

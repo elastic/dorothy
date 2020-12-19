@@ -25,8 +25,7 @@ import click
 
 from dorothy.core import (
     Module,
-    get_user_object,
-    execute_lifecycle_operation,
+    OktaUser,
     index_event,
 )
 from dorothy.modules.persistence.persistence import persistence
@@ -122,7 +121,7 @@ def execute(ctx):
     user_id = MODULE_OPTIONS["id"]["value"]
 
     click.echo("""[*] Attempting to retrieve user's current state""")
-    user = get_user_object(ctx, user_id)
+    user = ctx.obj.okta.get_user(ctx, user_id)
     if not user:
         return
 
@@ -141,7 +140,8 @@ def execute(ctx):
             index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
             click.echo(f"[*] {msg}")
 
-            execute_lifecycle_operation(ctx, user_id, lifecycle_operation)
+            user = OktaUser({"id": user_id})
+            user.execute_lifecycle_operation(ctx, lifecycle_operation)
 
             return
         else:

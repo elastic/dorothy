@@ -25,7 +25,7 @@ from pathlib import Path
 
 import click
 
-from dorothy.core import OktaUser, write_json_file, load_json_file, list_enrolled_factors, list_users, index_event
+from dorothy.core import OktaUser, write_json_file, load_json_file, list_users, index_event
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -117,16 +117,18 @@ def check_enrolled_factors(ctx, users):
 
     # Don't put print statements under click.progressbar otherwise the progress bar will be interrupted
     with click.progressbar(users, label="[*] Checking for users without MFA enrolled") as users:
-        for user in users:
-            factors, error = list_enrolled_factors(ctx, user.get("id"), mute=True)
+        for okta_user in users:
+            user = OktaUser(okta_user)
+            factors, error = user.list_enrolled_factors(ctx, mute=True)
+
             # Stop trying to check enrolled MFA factors if the current API token doesn't have that permission
             if error:
                 return
 
             if not factors:
-                users_without_mfa.append(user)
+                users_without_mfa.append(user.obj)
 
-                msg = f'User {user["id"]} does not have any MFA factors enrolled'
+                msg = f'User {user.obj["id"]} does not have any MFA factors enrolled'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
 

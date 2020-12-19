@@ -29,7 +29,7 @@ from requests.sessions import Session
 
 import dorothy.core as core
 from dorothy.config import check_saved_data, load_config_profiles, choose_profile, create_profile
-from dorothy.core import setup_session_instance, setup_elasticsearch_client, index_event
+from dorothy.core import OktaOrg, setup_session_instance, setup_elasticsearch_client
 from dorothy.wrappers import rootshell
 
 BANNER = r"""
@@ -66,9 +66,11 @@ POLICY_TYPES = ["OKTA_SIGN_ON", "PASSWORD", "MFA_ENROLL", "OAUTH_AUTHORIZATION_P
 @dataclass
 class Dorothy:
     """
-    Dataclass used to store relevant attributes in an object and pass it between Dorothy's modules
+    Data class used to store relevant attributes in an object and pass it between Dorothy's modules
     """
 
+    # Data class for Okta organization
+    okta: OktaOrg
     # Base URL for Okta API
     base_url: str
     # Okta API token to use for operations
@@ -141,6 +143,7 @@ def dorothy_shell(ctx):
     es_client = setup_elasticsearch_client(config["okta_url"])
 
     ctx.obj = Dorothy(
+        okta=OktaOrg(config["api_token"], config["okta_url"]),
         base_url=config["okta_url"],
         api_token=config["api_token"],
         root_dir=ROOT_DIR,

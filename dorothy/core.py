@@ -40,6 +40,8 @@ URL_OR_API_TOKEN_ERROR = "ERROR. Verify that the Okta URL and API token in your 
 
 @dataclass
 class Module:
+    """Dorothy module"""
+
     module_options: dict
 
     def print_info(self):
@@ -51,7 +53,7 @@ class Module:
         click.echo(tabulate(options, headers=headers, tablefmt="pretty"))
 
     def set_options(self, ctx, new_options):
-        """Set one or more options for a module"""
+        """Set one or more options for the module"""
 
         if all(value is None for value in new_options.values()):
             return click.echo(ctx.get_help())
@@ -70,14 +72,14 @@ class Module:
         return self.module_options
 
     def reset_options(self):
-        """Reset all options for a module"""
+        """Reset all options for the module"""
         for k, v in self.module_options.items():
             v["value"] = None
 
         return self.module_options
 
     def check_options(self):
-        """Check a module's configured options for issues"""
+        """Check the module's configured options for issues"""
 
         # Check for any required options that are missing
         for k, v in self.module_options.items():
@@ -95,12 +97,128 @@ class Module:
 
 
 @dataclass
+class OktaOrg:
+    """Data class for an Okta organization"""
+
+    api_token: str
+    base_url: str
+
+    def get_current_user(self, ctx):
+        """Get the user linked to the current API token"""
+
+        payload = {}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {self.api_token}",
+        }
+        url = f"{self.base_url}/users/me"
+
+        try:
+            response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if not response.ok:
+            msg = (
+                f"Error retrieving user information\n"
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+            return
+
+        if response.ok:
+            user = OktaUser(response.json())
+            user.print_info()
+            return user
+
+    def get_user(self, ctx, user_id):
+        """Get a user from the Okta environment using the user's ID"""
+
+        payload = {}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {self.api_token}",
+        }
+
+        url = f"{self.base_url}/users/{user_id}"
+
+        try:
+            response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if not response.ok:
+            msg = (
+                f"Error retrieving user information\n"
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+            click.echo("[*] This error is expected if the user object was deleted")
+            user = None
+            return user
+
+        if response.ok:
+            user = OktaUser(response.json())
+            user.print_info()
+            return user
+
+    def get_users(self, ctx, query=None, search_filter=None, search=None):
+        """Get all users from the Okta environment with pagination in most cases
+
+        If no parameters are provided, all users that do not have a status of DEPROVISIONED are listed
+        """
+        pass
+
+    def get_groups(self, ctx):
+        """Get all groups from the Okta environment"""
+        pass
+
+    def list_policies_by_type(self, ctx, policy_type):
+        """Get all policies from the Okta environment by type"""
+        pass
+
+    def get_policy_object(self, ctx, policy_id, rules=False):
+        """Get a policy object and optionally, its rules"""
+        pass
+
+    def list_zones(self, ctx):
+        """Get all network zones from the Okta environment"""
+
+    def get_zone_object(self, ctx, zone_id):
+        """Get a network zone from the Okta environment"""
+        pass
+
+    def list_apps(self, ctx):
+        """Get all applications from the Okta environment"""
+        pass
+
+    def get_app_object(self, ctx, app_id):
+        """Get an Okta application object from the Okta environment using its unique ID"""
+        pass
+
+
+@dataclass
 class OktaUser:
-    # Okta user object
+    """Data class for an Okta user"""
+
     obj: dict
 
     def print_info(self):
-        """Print basic info for Okta user"""
+        """Print basic info for the Okta user"""
 
         click.echo(f'[*] User information for ID {self.obj.get("id")}, login {self.obj["profile"].get("login")}:')
         click.echo(
@@ -112,7 +230,7 @@ class OktaUser:
         )
 
     def get_groups(self, ctx):
-        """Fetch the groups of which the user is a member"""
+        """Get the user's group memberships"""
 
         payload = {}
         headers = {
@@ -156,6 +274,198 @@ class OktaUser:
             click.echo(f"[*] Group memberships for user ID {self.obj['id']}:")
             print_group_information(groups)
 
+    def list_roles(self, ctx, mute=False):
+        """List the admin roles assigned to the user"""
+        assigned_roles, error = list_assigned_roles(ctx, self.obj["id"], object_type="user", mute=mute)
+        return assigned_roles, error
+
+    def assign_admin_role(self, ctx, role_type):
+        """Assign an admin role to the user"""
+        assign_admin_role(ctx, self.obj["id"], role_type, target="user")
+
+    def execute_lifecycle_operation(self, ctx, operation):
+        """Execute a lifecycle operation on the user object to change its state"""
+
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        # Set sendEmail to False. The default value for sendEmail is True, which will send the one-time token to the
+        # target user
+        if click.confirm("[*] Do you want to send an email notification to the user/administrator?", default=False):
+            params = {}
+        else:
+            params = {"sendEmail": "False"}
+        payload = {}
+
+        try:
+            if operation == "DELETE":
+                url = f'{ctx.obj.base_url}/users/{self.obj["id"]}'
+                response = ctx.obj.session.delete(url, headers=headers, params=params, json=payload, timeout=7)
+            else:
+                url = f'{ctx.obj.base_url}/users/{self.obj["id"]}/lifecycle/{operation.lower()}'
+                response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if response.ok:
+            msg = f'Operation {operation} executed on user ID {self.obj["id"]}'
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+            ctx.obj.okta.get_user(ctx, self.obj["id"])
+
+        else:
+            msg = (
+                f'Error executing {operation} on user ID {self.obj["id"]}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+
+            ctx.obj.okta.get_user(ctx, self.obj["id"])
+
+            return
+
+    def list_enrolled_factors(self, ctx, mute=False):
+        """List the user's enrolled MFA factors"""
+
+        payload = {}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        url = f'{ctx.obj.base_url}/users/{self.obj["id"]}/factors'
+
+        msg = f'Attempting to get enrolled MFA factors for user {self.obj["id"]}'
+        LOGGER.info(msg)
+        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+        if not mute:
+            click.echo(f"[*] {msg}")
+
+        enrolled_factors = []
+        error = False
+
+        try:
+            response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if not response.ok:
+            msg = (
+                f'Error retrieving enrolled MFA factors for user {self.obj["id"]}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+            error = True
+            return enrolled_factors, error
+
+        if response.ok:
+            enrolled_factors = response.json()
+
+        return enrolled_factors, error
+
+    def reset_factor(self, ctx, factor_id):
+        """Delete an enrolled MFA factor for the user"""
+
+        payload = {}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        url = f'{ctx.obj.base_url}/users/{self.obj["id"]}/factors/{factor_id}'
+
+        msg = f'Attempting to delete enrolled MFA factor {factor_id} for user {self.obj["id"]}'
+        LOGGER.info(msg)
+        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+        click.echo(f"[*] {msg}")
+
+        try:
+            response = ctx.obj.session.delete(url, headers=headers, data=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if not response.ok:
+            msg = (
+                f'Error deleting MFA factor {factor_id} for user {self.obj["id"]}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+            return
+
+        if response.ok:
+            msg = f'MFA factor {factor_id} deleted for user {self.obj["id"]}'
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+
+@dataclass
+class OktaGroup:
+    """Data class for an Okta group"""
+
+    obj: dict
+
+    def list_roles(self, ctx, mute=False):
+        """List the admin roles assigned to the group"""
+        pass
+
+    def assign_admin_role(self):
+        """Assign an admin role to the user"""
+        pass
+
+
+@dataclass
+class OktaApp:
+    """Data class for an Okta application"""
+
+    obj: dict
+
+
+@dataclass
+class OktaPolicy:
+    """Data class for an Okta policy"""
+
+    obj: dict
+
+
+@dataclass
+class OktaPolicyRule:
+    """Data class for an Okta policy rule"""
+
+    obj: dict
+
+
+@dataclass
+class OktaZone:
+    """Data class for an Okta network zone"""
+
+    obj: dict
+
 
 def list_modules(obj):
     """List all of Dorothy's modules"""
@@ -191,14 +501,16 @@ def list_modules(obj):
 def whoami(ctx):
     """Get info for user linked with current API token"""
 
+    okta = OktaOrg(ctx.obj.api_token, ctx.obj.base_url)
+
     msg = "Attempting to get user information associated with current API token"
     LOGGER.info(msg)
     index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
     click.echo(f"[*] {msg}")
 
-    user = get_current_user(ctx)
+    user = ctx.obj.okta.get_current_user(ctx)
     if user:
-        list_assigned_roles(ctx, user.obj.get("id"), object_type="user")
+        user.list_roles(ctx, mute=False)
     else:
         msg = """Unable to list current user's assigned roles. No user object found"""
         LOGGER.error(msg)
@@ -299,81 +611,6 @@ def index_event(es, module, event_type, event):
             click.secho(
                 f"[!] Error indexing event in Elasticsearch. Review dorothy.log for further information", fg="red"
             )
-
-
-def get_current_user(ctx):
-    """Fetch the user linked to the current API token"""
-
-    payload = {}
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-    url = f"{ctx.obj.base_url}/users/me"
-
-    try:
-        response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if not response.ok:
-        msg = (
-            f"Error retrieving user information\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-        return
-
-    if response.ok:
-        user = OktaUser(response.json())
-        user.print_info()
-        return user
-
-
-def get_user_object(ctx, user_id):
-    """Fetch a user from the Okta environment using the user's ID"""
-
-    payload = {}
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    url = f"{ctx.obj.base_url}/users/{user_id}"
-
-    try:
-        response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if not response.ok:
-        msg = (
-            f"Error retrieving user information\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-        click.echo("[*] This error is expected if the user object was deleted")
-        user = None
-        return user
-
-    if response.ok:
-        user = OktaUser(response.json())
-        user.print_info()
-        return user
 
 
 def list_assigned_roles(ctx, unique_id, object_type, mute=False):
@@ -612,6 +849,7 @@ def list_groups(ctx):
         click.echo(f"[*] {msg}")
 
         if click.confirm("[*] Do you want to print harvested group information?", default=True):
+
             print_group_information(harvested_groups)
 
         if click.confirm("[*] Do you want to save harvested group information to a file?", default=True):
@@ -621,13 +859,13 @@ def list_groups(ctx):
     return harvested_groups
 
 
-def assign_admin_role(ctx, id, role_type, target):
+def assign_admin_role(ctx, object_id, role_type, target):
     """Assign an admin role to a user or group"""
 
     if target == "user":
-        url = f"{ctx.obj.base_url}/users/{id}/roles"
+        url = f"{ctx.obj.base_url}/users/{object_id}/roles"
     elif target == "group":
-        url = f"{ctx.obj.base_url}/groups/{id}/roles"
+        url = f"{ctx.obj.base_url}/groups/{object_id}/roles"
     else:
         click.secho('''[!] Invalid type. Must be "user" or "group"''', fg="red")
         return
@@ -650,7 +888,7 @@ def assign_admin_role(ctx, id, role_type, target):
         response = None
 
     if response.ok:
-        msg = f"Admin role, {role_type} assigned to {target} {id}"
+        msg = f"Admin role, {role_type} assigned to {target} {object_id}"
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
@@ -684,59 +922,6 @@ def setup_session_instance(url):
     session.mount(url, okta_adapter)
 
     return session
-
-
-def execute_lifecycle_operation(ctx, user_id, operation):
-    """Execute a lifecycle operation on a user object to change its state"""
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    # Set sendEmail to False. The default value for sendEmail is True, which will send the one-time token to the
-    # target user
-    if click.confirm("[*] Do you want to send an email notification to the user/administrator?", default=False):
-        params = {}
-    else:
-        params = {"sendEmail": "False"}
-    payload = {}
-
-    try:
-        if operation == "DELETE":
-            url = f"{ctx.obj.base_url}/users/{user_id}"
-            response = ctx.obj.session.delete(url, headers=headers, params=params, json=payload, timeout=7)
-        else:
-            url = f"{ctx.obj.base_url}/users/{user_id}/lifecycle/{operation.lower()}"
-            response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if response.ok:
-        msg = f"Operation {operation} executed on user ID {user_id}"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")
-
-        get_user_object(ctx, user_id)
-
-    else:
-        msg = (
-            f"Error executing {operation} on user ID {user_id}\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-
-        get_user_object(ctx, user_id)
-
-        return
 
 
 def print_policy_object(policy):
@@ -1396,93 +1581,3 @@ def set_app_state(ctx, app_id, operation):
         get_app_object(ctx, app_id)
 
         return
-
-
-def list_enrolled_factors(ctx, user_id, mute=False):
-    """List a user's enrolled MFA factors"""
-
-    payload = {}
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    url = f"{ctx.obj.base_url}/users/{user_id}/factors"
-
-    msg = f"Attempting to get enrolled MFA factors for user {user_id}"
-    LOGGER.info(msg)
-    index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-    if not mute:
-        click.echo(f"[*] {msg}")
-
-    enrolled_factors = []
-    error = False
-
-    try:
-        response = ctx.obj.session.get(url, headers=headers, data=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if not response.ok:
-        msg = (
-            f"""Error retrieving enrolled MFA factors for user {user_id}\n"""
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-        error = True
-        return enrolled_factors, error
-
-    if response.ok:
-        enrolled_factors = response.json()
-
-    return enrolled_factors, error
-
-
-def reset_factor(ctx, user_id, factor_id):
-    """Delete an enrolled MFA factor for a user"""
-
-    payload = {}
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    url = f"{ctx.obj.base_url}/users/{user_id}/factors/{factor_id}"
-
-    msg = f"Attempting to delete enrolled MFA factor {factor_id} for user {user_id}"
-    LOGGER.info(msg)
-    index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-    click.echo(f"[*] {msg}")
-
-    try:
-        response = ctx.obj.session.delete(url, headers=headers, data=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if not response.ok:
-        msg = (
-            f"""Error deleting MFA factor {factor_id} for user {user_id}\n"""
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-        return
-
-    if response.ok:
-        msg = f"MFA factor {factor_id} deleted for user {user_id}"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")

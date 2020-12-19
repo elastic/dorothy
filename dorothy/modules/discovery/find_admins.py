@@ -32,7 +32,6 @@ from dorothy.core import (
     list_users,
     print_role_info,
     index_event,
-    list_assigned_roles,
 )
 from dorothy.modules.discovery.discovery import discovery
 
@@ -131,7 +130,7 @@ def check_assigned_roles(ctx, users):
     with click.progressbar(users, label="[*] Checking users for admin roles") as users:
         for okta_user in users:
             user = OktaUser(okta_user)
-            assigned_roles, error = list_assigned_roles(ctx, user.obj["id"], object_type="user", mute=True)
+            assigned_roles, error = user.list_roles(ctx, mute=True)
             # Stop trying to check roles if the current API token doesn't have that permission
             if error:
                 return

@@ -25,7 +25,7 @@ import click
 
 from dorothy.core import (
     Module,
-    assign_admin_role,
+    OktaUser,
     index_event,
 )
 from dorothy.modules.persistence.persistence import persistence
@@ -97,7 +97,8 @@ def execute(ctx):
             index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
             click.echo(f"[*] {msg}")
 
-            assign_admin_role(ctx, user_id, role_type, target="user")
+            user = OktaUser({"id": user_id})
+            user.assign_admin_role(ctx, role_type)
 
             return
 
