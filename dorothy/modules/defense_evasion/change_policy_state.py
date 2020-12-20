@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_policy_object,
     set_policy_state,
     index_event,
 )
@@ -84,7 +83,7 @@ def execute(ctx):
 
     policy_id = MODULE_OPTIONS["id"]["value"]
 
-    policy = get_policy_object(ctx, policy_id, rules=False)
+    policy = ctx.obj.okta.get_policy(ctx, policy_id, rules=False)
 
     if policy:
         if policy["status"] == "ACTIVE":

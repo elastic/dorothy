@@ -26,7 +26,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_policy_object,
     get_policy_rule,
     index_event,
 )
@@ -151,7 +150,6 @@ def rename_policy_rule(ctx, policy_id, rule, original_name, new_name):
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
-        get_policy_object(ctx, policy_id)
         time.sleep(1)
 
     else:

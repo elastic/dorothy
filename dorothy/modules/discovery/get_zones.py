@@ -23,7 +23,7 @@ import logging.config
 
 import click
 
-from dorothy.core import list_zones, index_event
+from dorothy.core import index_event
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -48,4 +48,4 @@ def execute(ctx):
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.echo(f"[*] {msg}")
 
-        list_zones(ctx)
+        ctx.obj.okta.get_zones(ctx)

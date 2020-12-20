@@ -23,7 +23,7 @@ import logging.config
 
 import click
 
-from dorothy.core import write_json_file, list_policies_by_type, get_policy_object, print_policy_object, index_event
+from dorothy.core import write_json_file, print_policy_object, index_event
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def execute(ctx):
 
         # Get a list of all policies by policy type
         for policy_type in policy_types:
-            policies = list_policies_by_type(ctx, policy_type)
+            policies = ctx.obj.okta.get_policies_by_type(ctx, policy_type)
             if policies:
                 harvested_policies.extend(policies)
 
@@ -61,7 +61,7 @@ def execute(ctx):
         # Get all policies again including their rules
         if harvested_policies:
             for policy in harvested_policies:
-                policy_and_rules = get_policy_object(ctx, policy["id"], rules=True)
+                policy_and_rules = ctx.obj.okta.get_policy(ctx, policy["id"], rules=True)
                 if not policy_and_rules:
                     msg = f'Issue retrieving policy {policy["id"]} ({policy["name"]}) with rules'
                     LOGGER.error(msg)

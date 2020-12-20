@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_app_object,
     set_app_state,
     index_event,
 )
@@ -84,7 +83,7 @@ def execute(ctx):
 
     app_id = MODULE_OPTIONS["id"]["value"]
 
-    app = get_app_object(ctx, app_id)
+    app = ctx.obj.okta.get_app(ctx, app_id)
 
     if app:
         if app["status"] == "ACTIVE":

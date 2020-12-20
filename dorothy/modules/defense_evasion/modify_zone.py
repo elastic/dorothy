@@ -26,7 +26,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_zone_object,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -84,7 +83,7 @@ def execute(ctx):
 
     zone_id = MODULE_OPTIONS["id"]["value"]
 
-    zone = get_zone_object(ctx, zone_id)
+    zone = ctx.obj.okta.get_zone(ctx, zone_id)
 
     if zone:
         original_name = zone["name"]
@@ -130,7 +129,7 @@ def rename_zone(ctx, zone, original_name, new_name):
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
-        get_zone_object(ctx, zone["id"])
+        ctx.obj.okta.get_zone(ctx, zone["id"])
         time.sleep(1)
 
     else:

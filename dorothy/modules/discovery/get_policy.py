@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_policy_object,
     print_policy_object,
     write_json_file,
     index_event,
@@ -85,7 +84,7 @@ def execute(ctx):
     index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
     click.echo(f"[*] {msg}")
 
-    policy = get_policy_object(ctx, MODULE_OPTIONS["id"]["value"], rules=True)
+    policy = ctx.obj.okta.get_policy(ctx, MODULE_OPTIONS["id"]["value"], rules=True)
 
     if policy:
         print_policy_object(policy)

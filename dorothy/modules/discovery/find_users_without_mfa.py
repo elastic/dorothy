@@ -25,7 +25,7 @@ from pathlib import Path
 
 import click
 
-from dorothy.core import OktaUser, write_json_file, load_json_file, list_users, index_event
+from dorothy.core import OktaUser, write_json_file, load_json_file, index_event
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ def execute(ctx):
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                users = list_users(ctx)
+                users = ctx.obj.okta.get_users(ctx)
                 check_enrolled_factors(ctx, users)
                 return
 

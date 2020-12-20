@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_zone_object,
     set_zone_state,
     index_event,
 )
@@ -80,7 +79,7 @@ def execute(ctx):
 
     zone_id = MODULE_OPTIONS["id"]["value"]
 
-    zone = get_zone_object(ctx, zone_id)
+    zone = ctx.obj.okta.get_zone(ctx, zone_id)
 
     if zone:
         if zone["status"] == "ACTIVE":

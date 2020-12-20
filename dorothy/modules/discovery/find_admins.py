@@ -29,7 +29,6 @@ from dorothy.core import (
     OktaUser,
     write_json_file,
     load_json_file,
-    list_users,
     print_role_info,
     index_event,
 )
@@ -103,7 +102,7 @@ def execute(ctx):
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                users = list_users(ctx)
+                users = ctx.obj.okta.get_users(ctx)
                 check_assigned_roles(ctx, users)
                 return
 

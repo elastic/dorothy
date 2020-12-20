@@ -25,7 +25,7 @@ from pathlib import Path
 
 import click
 
-from dorothy.core import write_json_file, load_json_file, list_assigned_roles, list_groups, print_role_info, index_event
+from dorothy.core import OktaGroup, write_json_file, load_json_file, print_role_info, index_event
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def execute(ctx):
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                groups = list_groups(ctx)
+                groups = ctx.obj.okta.get_groups(ctx)
                 check_assigned_roles(ctx, groups)
                 return
 
@@ -113,19 +113,21 @@ def check_assigned_roles(ctx, groups):
 
     # Don't put print statements under click.progressbar otherwise the progress bar will be interrupted
     with click.progressbar(groups, label="[*] Checking groups for admin roles") as groups:
-        for group in groups:
-            assigned_roles, error = list_assigned_roles(ctx, group.get("id"), object_type="group", mute=True)
+        for okta_group in groups:
+            group = OktaGroup(okta_group)
+            assigned_roles, error = group.list_roles(ctx, mute=True)
+
             # Stop trying to check roles if the current API token doesn't have that permission
             if error:
                 return
 
             if assigned_roles:
-                admin_group = {"group": group, "roles": assigned_roles}
+                admin_group = {"group": group.obj, "roles": assigned_roles}
                 admin_groups.append(admin_group)
 
                 for role in assigned_roles:
                     if role["type"] in ctx.obj.admin_roles:
-                        msg = f'Group ID {group["id"]} has admin role {role["type"]} assigned'
+                        msg = f'Group ID {group.obj["id"]} has admin role {role["type"]} assigned'
                         LOGGER.info(msg)
                         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
 

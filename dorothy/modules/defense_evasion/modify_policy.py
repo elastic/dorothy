@@ -26,7 +26,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_policy_object,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -89,7 +88,7 @@ def execute(ctx):
 
     policy_id = MODULE_OPTIONS["id"]["value"]
 
-    policy = get_policy_object(ctx, policy_id)
+    policy = ctx.obj.okta.get_policy(ctx, policy_id)
 
     if policy:
         original_name = policy["name"]
@@ -135,7 +134,6 @@ def rename_policy(ctx, policy_id, policy_type, original_name, new_name):
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
-        get_policy_object(ctx, policy_id)
         time.sleep(1)
 
     else:
