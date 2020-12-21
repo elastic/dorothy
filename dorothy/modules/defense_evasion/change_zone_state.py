@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    set_zone_state,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -82,23 +81,25 @@ def execute(ctx):
     zone = ctx.obj.okta.get_zone(ctx, zone_id)
 
     if zone:
-        if zone["status"] == "ACTIVE":
+        if zone.obj["status"] == "ACTIVE":
             click.echo("[*] Zone is ACTIVE")
-            if click.confirm(f'[*] Do you want to deactivate zone {zone_id} ({zone["name"]})?', default=True):
-                msg = f'Attempting to deactivate zone {zone_id} ({zone["name"]})'
+            if click.confirm(
+                f'[*] Do you want to deactivate zone {zone.obj["id"]} ({zone.obj["name"]})?', default=True
+            ):
+                msg = f'Attempting to deactivate zone {zone.obj["id"]} ({zone.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_zone_state(ctx, zone["id"], operation="DEACTIVATE")
+                zone.change_state(ctx, operation="DEACTIVATE")
 
-        elif zone["status"] == "INACTIVE":
+        elif zone.obj["status"] == "INACTIVE":
             click.echo("[*] Zone is INACTIVE")
-            if click.confirm(f'[*] Do you want to activate zone {zone_id} ({zone["name"]})?', default=True):
-                msg = f'Attempting to activate zone {zone_id} ({zone["name"]})'
+            if click.confirm(f'[*] Do you want to activate zone {zone.obj["id"]} ({zone.obj["name"]})?', default=True):
+                msg = f'Attempting to activate zone {zone.obj["id"]} ({zone.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_zone_state(ctx, zone["id"], operation="ACTIVATE")
+                zone.change_state(ctx, operation="ACTIVATE")
 
         else:
-            click.echo(f'[*] Policy status is {zone["status"]}')
+            click.echo(f'[*] Zone status is {zone.obj["status"]}')

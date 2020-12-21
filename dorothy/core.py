@@ -455,6 +455,56 @@ class OktaOrg:
                 "[!] The policy might have more than the maximum (20) number of rules that can be retrieved", fg="red"
             )
 
+    def get_policy_rule(self, ctx, policy_id, rule_id):
+        """Get a policy rule object using the policy ID and rule ID"""
+
+        msg = f"Attempting to get policy rule {rule_id} from policy {policy_id}"
+        LOGGER.info(msg)
+        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+        click.echo(f"[*] {msg}")
+
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {self.api_token}",
+        }
+
+        params = {}
+        payload = {}
+
+        url = f"{self.base_url}/policies/{policy_id}/rules/{rule_id}"
+
+        try:
+            response = ctx.obj.session.get(url, headers=headers, params=params, data=payload, timeout=7)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if response.ok:
+            msg = f"Retrieved policy rule {rule_id} from policy {policy_id}"
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+            rule = response.json()
+
+            OktaPolicyRule(rule).print_info()
+
+            return rule
+
+        else:
+            msg = (
+                f"Error retrieving rule, {policy_id}\n"
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | '
+                f'Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+
     def get_zones(self, ctx):
         """Get all network zones from the Okta environment"""
 
@@ -520,8 +570,9 @@ class OktaOrg:
             file_path = f"{ctx.obj.data_dir}/{ctx.obj.profile_id}_harvested_zones"
 
             if click.confirm("[*] Do you want to print harvested network zone information?", default=True):
-                for zone in harvested_zones:
-                    print_zone_object(zone)
+                for okta_zone in harvested_zones:
+                    zone = OktaZone(okta_zone)
+                    zone.print_info()
 
             if click.confirm("[*] Do you want to save harvested network zone information to a file?", default=True):
                 write_json_file(file_path, harvested_zones)
@@ -561,9 +612,9 @@ class OktaOrg:
             index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
             click.secho(f"[*] {msg}", fg="green")
 
-            zone = response.json()
+            zone = OktaZone(response.json())
 
-            print_zone_object(zone)
+            zone.print_info()
 
             return zone
 
@@ -641,8 +692,9 @@ class OktaOrg:
             click.secho(f"[*] {msg}", fg="green")
 
             if click.confirm("[*] Do you want to print harvested application info?", default=True):
-                for app in harvested_apps:
-                    print_app_object(app)
+                for okta_app in harvested_apps:
+                    app = OktaApp(okta_app)
+                    app.print_info()
 
             if click.confirm("[*] Do you want to save harvested applications information to a file?", default=True):
                 file_path = f"{ctx.obj.data_dir}/{ctx.obj.profile_id}_harvested_apps"
@@ -683,9 +735,9 @@ class OktaOrg:
             index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
             click.secho(f"[*] {msg}", fg="green")
 
-            app = response.json()
+            app = OktaApp(response.json())
 
-            print_app_object(app)
+            app.print_info()
 
             return app
 
@@ -955,12 +1007,57 @@ class OktaZone:
     def print_info(self):
         """Print basic info for the Okta network zone"""
 
-        pass
+        click.echo(f'[*] Information for network zone ID {self.obj.get("id")} ({self.obj.get("name")}):')
+        click.echo(
+            f'    Status: {self.obj.get("status", "unknown")}\n'
+            f'    Created: {self.obj.get("created", "unknown")}\n'
+            f'    Last Updated: {self.obj.get("lastUpdated", "unknown")}'
+        )
 
-    def change_state(self):
+    def change_state(self, ctx, operation):
         """Activate or deactivate the Okta network"""
 
-        pass
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        params = {}
+        payload = {}
+
+        url = f'{ctx.obj.base_url}/zones/{self.obj["id"]}/lifecycle/{operation.lower()}'
+
+        try:
+            response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
+            time.sleep(1)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if response.ok:
+            msg = f'Zone {self.obj["id"]} {operation.lower()}d'
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+            ctx.obj.okta.get_zone(ctx, self.obj["id"])
+
+        else:
+            msg = (
+                f'Error executing {operation} for zone {self.obj["id"]}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+
+            ctx.obj.okta.get_zone(ctx, self.obj["id"])
+
+            return
 
 
 @dataclass
@@ -972,12 +1069,58 @@ class OktaApp:
     def print_info(self):
         """Print basic info for the Okta application"""
 
-        pass
+        click.echo(f'[*] Information for application {self.obj.get("id")} ({self.obj.get("name")}):')
+        click.echo(
+            f'    Status: {self.obj.get("status", "unknown")}\n'
+            f'    Label: {self.obj.get("label", "unknown")}\n'
+            f'    Created: {self.obj.get("created", "unknown")}\n'
+            f'    Last Updated: {self.obj.get("lastUpdated", "unknown")}'
+        )
 
-    def change_state(self):
+    def change_state(self, ctx, operation):
         """Activate or deactivate the Okta application"""
 
-        pass
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        params = {}
+        payload = {}
+
+        url = f'{ctx.obj.base_url}/apps/{self.obj["id"]}/lifecycle/{operation.lower()}'
+
+        try:
+            response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
+            time.sleep(1)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if response.ok:
+            msg = f'Application {self.obj["id"]} {operation.lower()}d'
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+            ctx.obj.okta.get_app(ctx, self.obj["id"])
+
+        else:
+            msg = (
+                f'Error executing {operation} for application {self.obj["id"]}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+
+            ctx.obj.okta.get_app(ctx, self.obj["id"])
+
+            return
 
 
 @dataclass
@@ -989,12 +1132,54 @@ class OktaPolicy:
     def print_info(self):
         """Print basic info for the Okta policy"""
 
-        pass
+        click.echo(f'[*] Information for policy ID {self.obj.get("id")} ({self.obj.get("name")}):')
+        click.echo(
+            f'    Status: {self.obj.get("status", "unknown")}\n'
+            f'    Description: {self.obj.get("description", "unknown")}\n'
+            f'    Created: {self.obj.get("created", "unknown")}\n'
+            f'    Last Updated: {self.obj.get("lastUpdated", "unknown")}'
+        )
 
-    def change_state(self):
+    def change_state(self, ctx, operation):
         """Activate or deactivate the Okta policy"""
 
-        pass
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        params = {}
+        payload = {}
+
+        url = f'{ctx.obj.base_url}/policies/{self.obj["id"]}/lifecycle/{operation.lower()}'
+
+        try:
+            response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
+            time.sleep(1)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if response.ok:
+            msg = f'Policy {self.obj["id"]} {operation.lower()}d'
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+        else:
+            msg = (
+                f'Error executing {operation} for policy {self.obj["id"]}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+
+            return
 
 
 @dataclass
@@ -1006,12 +1191,57 @@ class OktaPolicyRule:
     def print_info(self):
         """Print basic info for the Okta policy rule"""
 
-        pass
+        click.echo(f'[*] Information for policy rule {self.obj.get("id")} ({self.obj.get("name")}):')
+        click.echo(
+            f'    Status: {self.obj.get("status", "unknown")}\n'
+            f'    Created: {self.obj.get("created", "unknown")}\n'
+            f'    Last Updated: {self.obj.get("lastUpdated", "unknown")}'
+        )
 
-    def change_state(self):
+    def change_state(self, ctx, policy_id, operation):
         """Activate or deactivate the Okta policy rule"""
 
-        pass
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"SSWS {ctx.obj.api_token}",
+        }
+
+        params = {}
+        payload = {}
+
+        url = f'{ctx.obj.base_url}/policies/{policy_id}/rules/{self.obj["id"]}/lifecycle/{operation.lower()}'
+
+        try:
+            response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
+            time.sleep(1)
+        except Exception as e:
+            LOGGER.error(e, exc_info=True)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
+            click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
+            response = None
+
+        if response.ok:
+            msg = f'Policy rule {self.obj["id"]} in policy {policy_id} {operation.lower()}d'
+            LOGGER.info(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
+            click.secho(f"[*] {msg}", fg="green")
+
+            ctx.obj.okta.get_policy_rule(ctx, policy_id, self.obj["id"])
+
+        else:
+            msg = (
+                f'Error executing {operation} for rule {self.obj["id"]} in policy {policy_id}\n'
+                f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
+                f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
+            )
+            LOGGER.error(msg)
+            index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
+            click.secho(f"[!] {msg}", fg="red")
+
+            ctx.obj.okta.get_policy_rule(ctx, policy_id, self.obj["id"])
+
+            return
 
 
 def list_modules(obj):
@@ -1308,281 +1538,5 @@ def assign_admin_role(ctx, object_id, role_type, target):
             "current API token might not have the SUPER_ADMIN role assigned",
             fg="red",
         )
-
-        return
-
-
-def print_policy_object(policy):
-    """Print basic info for an Okta policy"""
-
-    click.echo(f'[*] Information for policy ID {policy.get("id")} ({policy.get("name")}):')
-    click.echo(
-        f'    Status: {policy.get("status", "unknown")}\n'
-        f'    Description: {policy.get("description", "unknown")}\n'
-        f'    Created: {policy.get("created", "unknown")}\n'
-        f'    Last Updated: {policy.get("lastUpdated", "unknown")}'
-    )
-
-
-def set_policy_state(ctx, policy_id, operation):
-    """Activate or deactivate a policy"""
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    params = {}
-    payload = {}
-
-    url = f"{ctx.obj.base_url}/policies/{policy_id}/lifecycle/{operation.lower()}"
-
-    try:
-        response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
-        time.sleep(1)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if response.ok:
-        msg = f"Policy {policy_id} {operation.lower()}d"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")
-
-    else:
-        msg = (
-            f"Error executing {operation} for policy {policy_id}\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-
-        return
-
-
-def print_policy_rule(rule):
-    """Print basic info for an Okta policy rule"""
-
-    click.echo(f'[*] Information for policy rule {rule.get("id")} ({rule.get("name")}):')
-    click.echo(
-        f'    Status: {rule.get("status", "unknown")}\n'
-        f'    Created: {rule.get("created", "unknown")}\n'
-        f'    Last Updated: {rule.get("lastUpdated", "unknown")}'
-    )
-
-
-def get_policy_rule(ctx, policy_id, rule_id):
-    """Get a policy rule object using the policy ID and rule ID"""
-
-    msg = f"Attempting to get policy rule {rule_id} from policy {policy_id}"
-    LOGGER.info(msg)
-    index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-    click.echo(f"[*] {msg}")
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    params = {}
-    payload = {}
-
-    url = f"{ctx.obj.base_url}/policies/{policy_id}/rules/{rule_id}"
-
-    try:
-        response = ctx.obj.session.get(url, headers=headers, params=params, data=payload, timeout=7)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if response.ok:
-        msg = f"Retrieved policy rule {rule_id} from policy {policy_id}"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")
-
-        rule = response.json()
-
-        print_policy_rule(rule)
-
-        return rule
-
-    else:
-        msg = (
-            f"Error retrieving rule, {policy_id}\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | '
-            f'Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-
-
-def set_policy_rule_state(ctx, policy_id, rule_id, operation):
-    """Activate or deactivate a policy"""
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    params = {}
-    payload = {}
-
-    url = f"{ctx.obj.base_url}/policies/{policy_id}/rules/{rule_id}/lifecycle/{operation.lower()}"
-
-    try:
-        response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
-        time.sleep(1)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if response.ok:
-        msg = f"Policy rule {rule_id} in policy {policy_id} {operation.lower()}d"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")
-
-        get_policy_rule(ctx, policy_id, rule_id)
-
-    else:
-        msg = (
-            f"Error executing {operation} for rule {rule_id} in policy {policy_id}\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-
-        get_policy_rule(ctx, policy_id, rule_id)
-
-        return
-
-
-def print_zone_object(zone):
-    """Print basic info for an Okta network zone"""
-
-    click.echo(f'[*] Information for network zone ID {zone.get("id")} ({zone.get("name")}):')
-    click.echo(
-        f'    Status: {zone.get("status", "unknown")}\n'
-        f'    Created: {zone.get("created", "unknown")}\n'
-        f'    Last Updated: {zone.get("lastUpdated", "unknown")}'
-    )
-
-
-def set_zone_state(ctx, zone_id, operation):
-    """Activate or deactivate a network zone"""
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    params = {}
-    payload = {}
-
-    url = f"{ctx.obj.base_url}/zones/{zone_id}/lifecycle/{operation.lower()}"
-
-    try:
-        response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
-        time.sleep(1)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if response.ok:
-        msg = f"Zone {zone_id} {operation.lower()}d"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")
-
-        ctx.obj.okta.get_zone(ctx, zone_id)
-
-    else:
-        msg = (
-            f"Error executing {operation} for zone {zone_id}\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-
-        ctx.obj.okta.get_zone(ctx, zone_id)
-
-        return
-
-
-def print_app_object(app):
-    """Print basic info for an Okta application"""
-
-    click.echo(f'[*] Information for application {app.get("id")} ({app.get("name")}):')
-    click.echo(
-        f'    Status: {app.get("status", "unknown")}\n'
-        f'    Label: {app.get("label", "unknown")}\n'
-        f'    Created: {app.get("created", "unknown")}\n'
-        f'    Last Updated: {app.get("lastUpdated", "unknown")}'
-    )
-
-
-def set_app_state(ctx, app_id, operation):
-    """Activate or deactivate an Okta app"""
-
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Authorization": f"SSWS {ctx.obj.api_token}",
-    }
-
-    params = {}
-    payload = {}
-
-    url = f"{ctx.obj.base_url}/apps/{app_id}/lifecycle/{operation.lower()}"
-
-    try:
-        response = ctx.obj.session.post(url, headers=headers, params=params, json=payload, timeout=7)
-        time.sleep(1)
-    except Exception as e:
-        LOGGER.error(e, exc_info=True)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=e)
-        click.secho(f"[!] {URL_OR_API_TOKEN_ERROR}", fg="red")
-        response = None
-
-    if response.ok:
-        msg = f"Application {app_id} {operation.lower()}d"
-        LOGGER.info(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
-        click.secho(f"[*] {msg}", fg="green")
-
-        ctx.obj.okta.get_app(ctx, app_id)
-
-    else:
-        msg = (
-            f"Error executing {operation} for application {app_id}\n"
-            f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
-            f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
-        )
-        LOGGER.error(msg)
-        index_event(ctx.obj.es, module=__name__, event_type="ERROR", event=msg)
-        click.secho(f"[!] {msg}", fg="red")
-
-        ctx.obj.okta.get_app(ctx, app_id)
 
         return

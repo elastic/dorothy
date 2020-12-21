@@ -26,7 +26,6 @@ import click
 
 from dorothy.core import (
     Module,
-    get_policy_rule,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -100,7 +99,7 @@ def execute(ctx):
     policy_id = MODULE_OPTIONS["policy_id"]["value"]
     rule_id = MODULE_OPTIONS["rule_id"]["value"]
 
-    rule = get_policy_rule(ctx, policy_id, rule_id)
+    rule = ctx.obj.okta.get_policy_rule(ctx, policy_id, rule_id)
 
     if rule:
         original_name = rule["name"]

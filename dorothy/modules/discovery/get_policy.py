@@ -25,7 +25,7 @@ import click
 
 from dorothy.core import (
     Module,
-    print_policy_object,
+    OktaPolicy,
     write_json_file,
     index_event,
 )
@@ -84,10 +84,13 @@ def execute(ctx):
     index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
     click.echo(f"[*] {msg}")
 
-    policy = ctx.obj.okta.get_policy(ctx, MODULE_OPTIONS["id"]["value"], rules=True)
+    okta_policy = ctx.obj.okta.get_policy(ctx, MODULE_OPTIONS["id"]["value"], rules=True)
 
-    if policy:
-        print_policy_object(policy)
-        if click.confirm(f"[*] Do you want to save policy {policy['id']} ({policy['name']}) to a file?", default=True):
-            file_path = f'{ctx.obj.data_dir}/{ctx.obj.profile_id}_policy_{policy["id"]}'
-            write_json_file(file_path, policy)
+    if okta_policy:
+        policy = OktaPolicy(okta_policy)
+        policy.print_info()
+        if click.confirm(
+            f"[*] Do you want to save policy {policy.obj['id']} ({policy.obj['name']}) to a file?", default=True
+        ):
+            file_path = f'{ctx.obj.data_dir}/{ctx.obj.profile_id}_policy_{policy.obj["id"]}'
+            write_json_file(file_path, okta_policy)

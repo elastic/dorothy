@@ -25,7 +25,6 @@ import click
 
 from dorothy.core import (
     Module,
-    set_app_state,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -86,23 +85,27 @@ def execute(ctx):
     app = ctx.obj.okta.get_app(ctx, app_id)
 
     if app:
-        if app["status"] == "ACTIVE":
+        if app.obj["status"] == "ACTIVE":
             click.echo("[*] Application is ACTIVE")
-            if click.confirm(f'[*] Do you want to deactivate application {app_id} ({app["name"]})?', default=True):
-                msg = f'Attempting to deactivate application {app_id} ({app["name"]})'
+            if click.confirm(
+                f'[*] Do you want to deactivate application {app.obj["id"]} ({app.obj["name"]})?', default=True
+            ):
+                msg = f'Attempting to deactivate application {app.obj["id"]} ({app.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_app_state(ctx, app["id"], operation="DEACTIVATE")
+                app.change_state(ctx, operation="DEACTIVATE")
 
-        elif app["status"] == "INACTIVE":
+        elif app.obj["status"] == "INACTIVE":
             click.echo("[*] Application is INACTIVE")
-            if click.confirm(f'[*] Do you want to activate application {app_id} ({app["name"]})?', default=True):
-                msg = f'Attempting to activate application {app_id} ({app["name"]})'
+            if click.confirm(
+                f'[*] Do you want to activate application {app.obj["id"]} ({app.obj["name"]})?', default=True
+            ):
+                msg = f'Attempting to activate application {app.obj["id"]} ({app.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_app_state(ctx, app["id"], operation="ACTIVATE")
+                app.change_state(ctx, operation="ACTIVATE")
 
         else:
-            click.echo(f'[*] Policy status is {app["status"]}')
+            click.echo(f'[*] Application status is {app.obj["status"]}')

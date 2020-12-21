@@ -23,7 +23,7 @@ import logging.config
 
 import click
 
-from dorothy.core import write_json_file, print_policy_object, index_event
+from dorothy.core import OktaPolicy, write_json_file, index_event
 from dorothy.modules.discovery.discovery import discovery
 
 LOGGER = logging.getLogger(__name__)
@@ -72,8 +72,9 @@ def execute(ctx):
 
         if policies_and_rules:
             if click.confirm("[*] Do you want to print harvested policy information?", default=True):
-                for policy in policies_and_rules:
-                    print_policy_object(policy)
+                for okta_policy in policies_and_rules:
+                    policy = OktaPolicy(okta_policy)
+                    policy.print_info()
 
             if click.confirm(
                 f"[*] Do you want to save {len(policies_and_rules)} harvested policies to a file?", default=True

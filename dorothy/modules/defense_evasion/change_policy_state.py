@@ -25,7 +25,7 @@ import click
 
 from dorothy.core import (
     Module,
-    set_policy_state,
+    OktaPolicy,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -83,26 +83,30 @@ def execute(ctx):
 
     policy_id = MODULE_OPTIONS["id"]["value"]
 
-    policy = ctx.obj.okta.get_policy(ctx, policy_id, rules=False)
+    policy = OktaPolicy(ctx.obj.okta.get_policy(ctx, policy_id, rules=False))
 
     if policy:
-        if policy["status"] == "ACTIVE":
+        if policy.obj["status"] == "ACTIVE":
             click.echo("[*] Policy is ACTIVE")
-            if click.confirm(f'[*] Do you want to deactivate policy {policy_id} ({policy["name"]})?', default=True):
-                msg = f'Attempting to deactivate policy {policy_id} ({policy["name"]})'
+            if click.confirm(
+                f'[*] Do you want to deactivate policy {policy.obj["id"]} ({policy.obj["name"]})?', default=True
+            ):
+                msg = f'Attempting to deactivate policy {policy.obj["id"]} ({policy.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_policy_state(ctx, policy["id"], operation="DEACTIVATE")
+                policy.change_state(ctx, operation="DEACTIVATE")
 
-        elif policy["status"] == "INACTIVE":
+        elif policy.obj["status"] == "INACTIVE":
             click.echo("[*] Policy is INACTIVE")
-            if click.confirm(f'[*] Do you want to activate policy {policy_id} ({policy["name"]})?', default=True):
-                msg = f'Attempting to activate policy {policy_id} ({policy["name"]})'
+            if click.confirm(
+                f'[*] Do you want to activate policy {policy.obj["id"]} ({policy.obj["name"]})?', default=True
+            ):
+                msg = f'Attempting to activate policy {policy.obj["id"]} ({policy.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_policy_state(ctx, policy["id"], operation="ACTIVATE")
+                policy.change_state(ctx, operation="ACTIVATE")
 
         else:
-            click.echo(f'[*] Policy status is {policy["status"]}')
+            click.echo(f'[*] Policy status is {policy.obj["status"]}')
