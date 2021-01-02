@@ -25,12 +25,7 @@ import time
 import click
 
 from dorothy.core import (
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
-    get_policy_object,
-    get_policy_rule,
+    Module,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -44,6 +39,7 @@ MODULE_OPTIONS = {
     "policy_id": {"value": None, "required": True, "help": "The unique ID for the policy"},
     "rule_id": {"value": None, "required": True, "help": "The unique ID for the policy rule"},
 }
+MODULE = Module(MODULE_OPTIONS)
 
 
 @defense_evasion.subshell(name="modify-policy-rule")
@@ -58,13 +54,15 @@ def modify_policy_rule(ctx):
     # Change prompt depending on name of parent shell
     if ctx.parent.command.name == "impact":
         ctx.command.shell.prompt = "dorothy > impact > modify-policy-rule > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > modify-policy-rule > "
 
 
 @modify_policy_rule.command()
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @modify_policy_rule.command()
@@ -74,20 +72,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @modify_policy_rule.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @modify_policy_rule.command()
@@ -101,7 +93,7 @@ def clear():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return
@@ -109,7 +101,7 @@ def execute(ctx):
     policy_id = MODULE_OPTIONS["policy_id"]["value"]
     rule_id = MODULE_OPTIONS["rule_id"]["value"]
 
-    rule = get_policy_rule(ctx, policy_id, rule_id)
+    rule = ctx.obj.okta.get_policy_rule(ctx, policy_id, rule_id)
 
     if rule:
         original_name = rule["name"]
@@ -159,7 +151,6 @@ def rename_policy_rule(ctx, policy_id, rule, original_name, new_name):
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
-        get_policy_object(ctx, policy_id)
         time.sleep(1)
 
     else:

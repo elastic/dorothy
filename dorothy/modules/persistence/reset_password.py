@@ -20,11 +20,10 @@
 # Generate a one-time token (OTT) to reset a user's password
 
 import logging.config
-from textwrap import dedent
 
 import click
 
-from dorothy.core import print_module_info, set_module_options, reset_module_options, check_module_options, index_event
+from dorothy.core import Module, index_event
 from dorothy.modules.persistence.persistence import persistence
 
 LOGGER = logging.getLogger(__name__)
@@ -33,40 +32,26 @@ TACTICS = ["Persistence"]
 URL_OR_API_TOKEN_ERROR = "ERROR. Verify that the Okta URL and API token in your configuration profile are correct"
 
 MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID for the user"}}
+MODULE = Module(MODULE_OPTIONS)
 
 
 @persistence.subshell(name="reset-password")
 @click.pass_context
 def reset_password(ctx):
-    """Generate a one-time token to reset a user's password"""
+    """Generate a one-time token that can be used to reset a user's password
 
+    The user's status must be ACTIVE. A URL to the OTT will be displayed after the module is executed.
 
-@reset_password.command()
-@click.pass_context
-def help(ctx):
-    """Show help menu for this module"""
-
-    click.echo(ctx.parent.get_help())
-    click.echo(
-        dedent(
-            """
-        Description:
-        This module generates a one-time token (OTT) that can be used to reset a user's password. The user's status
-        must be ACTIVE. A URL to the OTT will be displayed after the module is executed.
-
-        The user will have the status of RECOVERY and will not be able to login or initiate the forgot password flow
-        until the password is reset.
-        """
-        )
-    )
-    click.echo('Execute "back" to return to the previous menu')
+    The user will have the status of RECOVERY and will not be able to login or initiate the forgot password flow
+    until the password is reset.
+    """
 
 
 @reset_password.command()
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @reset_password.command()
@@ -75,20 +60,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @reset_password.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @reset_password.command()
@@ -102,7 +81,7 @@ def clear():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return

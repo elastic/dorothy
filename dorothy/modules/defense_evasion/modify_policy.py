@@ -25,11 +25,7 @@ import time
 import click
 
 from dorothy.core import (
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
-    get_policy_object,
+    Module,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -40,6 +36,7 @@ TACTICS = ["Defense Evasion", "Impact"]
 URL_OR_API_TOKEN_ERROR = "ERROR. Verify that the Okta URL and API token in your configuration profile are correct"
 
 MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID for the policy"}}
+MODULE = Module(MODULE_OPTIONS)
 
 
 @defense_evasion.subshell(name="modify-policy")
@@ -54,13 +51,15 @@ def modify_policy(ctx):
     # Change prompt depending on name of parent shell
     if ctx.parent.command.name == "impact":
         ctx.command.shell.prompt = "dorothy > impact > modify-policy > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > modify-policy > "
 
 
 @modify_policy.command()
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @modify_policy.command()
@@ -69,20 +68,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @modify_policy.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @modify_policy.command()
@@ -90,14 +83,14 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return
 
     policy_id = MODULE_OPTIONS["id"]["value"]
 
-    policy = get_policy_object(ctx, policy_id)
+    policy = ctx.obj.okta.get_policy(ctx, policy_id)
 
     if policy:
         original_name = policy["name"]
@@ -143,7 +136,6 @@ def rename_policy(ctx, policy_id, policy_type, original_name, new_name):
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
-        get_policy_object(ctx, policy_id)
         time.sleep(1)
 
     else:

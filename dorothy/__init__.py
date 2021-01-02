@@ -25,7 +25,7 @@ import yaml
 import dorothy.modules
 from .core import setup_logging
 
-__version__ = "0.2.1"
+__version__ = "0.3.2"
 
 ROOT_DIR = Path(__file__).parent
 DATA_DIR = Path.home() / "dorothy" / "data"

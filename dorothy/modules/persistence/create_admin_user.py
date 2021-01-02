@@ -24,11 +24,8 @@ import logging.config
 import click
 
 from dorothy.core import (
-    assign_admin_role,
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
+    Module,
+    OktaUser,
     index_event,
 )
 from dorothy.modules.persistence.persistence import persistence
@@ -38,6 +35,7 @@ MODULE_DESCRIPTION = "Assign an admin role to an Okta user"
 TACTICS = ["Persistence"]
 
 MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID for the user"}}
+MODULE = Module(MODULE_OPTIONS)
 
 
 @persistence.subshell(name="create-admin-user")
@@ -52,7 +50,7 @@ def create_admin_user(ctx):
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @create_admin_user.command()
@@ -61,20 +59,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @create_admin_user.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @create_admin_user.command()
@@ -82,7 +74,7 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return
@@ -105,7 +97,8 @@ def execute(ctx):
             index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
             click.echo(f"[*] {msg}")
 
-            assign_admin_role(ctx, user_id, role_type, target="user")
+            user = OktaUser({"id": user_id})
+            user.assign_admin_role(ctx, role_type)
 
             return
 

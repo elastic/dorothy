@@ -24,12 +24,7 @@ import logging.config
 import click
 
 from dorothy.core import (
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
-    get_zone_object,
-    set_zone_state,
+    Module,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -39,6 +34,7 @@ MODULE_DESCRIPTION = "Deactivate or activate an Okta network zone"
 TACTICS = ["Defense Evasion", "Impact"]
 
 MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID for the network zone"}}
+MODULE = Module(MODULE_OPTIONS)
 
 
 @defense_evasion.subshell(name="change-zone-state")
@@ -46,12 +42,18 @@ MODULE_OPTIONS = {"id": {"value": None, "required": True, "help": "The unique ID
 def change_zone_state(ctx):
     """Deactivate or activate an Okta network zone"""
 
+    # Change prompt depending on name of parent shell
+    if ctx.parent.command.name == "impact":
+        ctx.command.shell.prompt = "dorothy > impact > change-zone-state > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > change-zone-state > "
+
 
 @change_zone_state.command()
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @change_zone_state.command()
@@ -60,20 +62,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @change_zone_state.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @change_zone_state.command()
@@ -81,33 +77,35 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return
 
     zone_id = MODULE_OPTIONS["id"]["value"]
 
-    zone = get_zone_object(ctx, zone_id)
+    zone = ctx.obj.okta.get_zone(ctx, zone_id)
 
     if zone:
-        if zone["status"] == "ACTIVE":
+        if zone.obj["status"] == "ACTIVE":
             click.echo("[*] Zone is ACTIVE")
-            if click.confirm(f'[*] Do you want to deactivate zone {zone_id} ({zone["name"]})?', default=True):
-                msg = f'Attempting to deactivate zone {zone_id} ({zone["name"]})'
+            if click.confirm(
+                f'[*] Do you want to deactivate zone {zone.obj["id"]} ({zone.obj["name"]})?', default=True
+            ):
+                msg = f'Attempting to deactivate zone {zone.obj["id"]} ({zone.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_zone_state(ctx, zone["id"], operation="DEACTIVATE")
+                zone.change_state(ctx, operation="DEACTIVATE")
 
-        elif zone["status"] == "INACTIVE":
+        elif zone.obj["status"] == "INACTIVE":
             click.echo("[*] Zone is INACTIVE")
-            if click.confirm(f'[*] Do you want to activate zone {zone_id} ({zone["name"]})?', default=True):
-                msg = f'Attempting to activate zone {zone_id} ({zone["name"]})'
+            if click.confirm(f'[*] Do you want to activate zone {zone.obj["id"]} ({zone.obj["name"]})?', default=True):
+                msg = f'Attempting to activate zone {zone.obj["id"]} ({zone.obj["name"]})'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_zone_state(ctx, zone["id"], operation="ACTIVATE")
+                zone.change_state(ctx, operation="ACTIVATE")
 
         else:
-            click.echo(f'[*] Policy status is {zone["status"]}')
+            click.echo(f'[*] Zone status is {zone.obj["status"]}')

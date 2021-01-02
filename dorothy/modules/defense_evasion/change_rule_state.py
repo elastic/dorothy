@@ -24,12 +24,8 @@ import logging.config
 import click
 
 from dorothy.core import (
-    print_module_info,
-    set_module_options,
-    reset_module_options,
-    check_module_options,
-    get_policy_rule,
-    set_policy_rule_state,
+    Module,
+    OktaPolicyRule,
     index_event,
 )
 from dorothy.modules.defense_evasion.defense_evasion import defense_evasion
@@ -42,6 +38,7 @@ MODULE_OPTIONS = {
     "policy_id": {"value": None, "required": True, "help": "The unique ID for the policy"},
     "rule_id": {"value": None, "required": True, "help": "The unique ID for the policy rule"},
 }
+MODULE = Module(MODULE_OPTIONS)
 
 
 @defense_evasion.subshell(name="change-rule-state")
@@ -52,13 +49,15 @@ def change_rule_state(ctx):
     # Change prompt depending on name of parent shell
     if ctx.parent.command.name == "impact":
         ctx.command.shell.prompt = "dorothy > impact > change-rule-state > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > change-rule-state > "
 
 
 @change_rule_state.command()
 def info():
     """Show available options and their current values for this module"""
 
-    print_module_info(MODULE_OPTIONS)
+    MODULE.print_info()
 
 
 @change_rule_state.command()
@@ -68,20 +67,14 @@ def info():
 def set(ctx, **kwargs):
     """Set one or more options for this module"""
 
-    if all(value is None for value in kwargs.values()):
-        return click.echo(ctx.get_help())
-
-    else:
-        global MODULE_OPTIONS
-        MODULE_OPTIONS = set_module_options(MODULE_OPTIONS, kwargs)
+    MODULE.set_options(ctx, kwargs)
 
 
 @change_rule_state.command()
 def reset():
     """Reset the options for this module"""
 
-    global MODULE_OPTIONS
-    MODULE_OPTIONS = reset_module_options(MODULE_OPTIONS)
+    MODULE.reset_options()
 
 
 @change_rule_state.command()
@@ -89,7 +82,7 @@ def reset():
 def execute(ctx):
     """Execute this module with the configured options"""
 
-    error = check_module_options(MODULE_OPTIONS)
+    error = MODULE.check_options()
 
     if error:
         return
@@ -97,26 +90,26 @@ def execute(ctx):
     policy_id = MODULE_OPTIONS["policy_id"]["value"]
     rule_id = MODULE_OPTIONS["rule_id"]["value"]
 
-    rule = get_policy_rule(ctx, policy_id, rule_id)
+    rule = OktaPolicyRule(ctx.obj.okta.get_policy_rule(ctx, policy_id, rule_id))
 
     if rule:
-        if rule["status"] == "ACTIVE":
+        if rule.obj["status"] == "ACTIVE":
             click.echo("[*] Rule is ACTIVE")
-            if click.confirm(f'[*] Do you want to deactivate rule {rule_id} ({rule["name"]})?', default=True):
-                msg = f'Attempting to deactivate rule {rule_id} ({rule["name"]}) in policy {policy_id}'
+            if click.confirm(f'[*] Do you want to deactivate rule {rule_id} ({rule.obj["name"]})?', default=True):
+                msg = f'Attempting to deactivate rule {rule_id} ({rule.obj["name"]}) in policy {policy_id}'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_policy_rule_state(ctx, policy_id, rule_id, operation="DEACTIVATE")
+                rule.change_state(ctx, policy_id, operation="DEACTIVATE")
 
-        elif rule["status"] == "INACTIVE":
+        elif rule.obj["status"] == "INACTIVE":
             click.echo("[*] Rule is INACTIVE")
-            if click.confirm(f'[*] Do you want to activate rule {rule_id} ({rule["name"]})?', default=True):
-                msg = f'Attempting to activate rule {rule_id} ({rule["name"]}) in policy {policy_id}'
+            if click.confirm(f'[*] Do you want to activate rule {rule_id} ({rule.obj["name"]})?', default=True):
+                msg = f'Attempting to activate rule {rule_id} ({rule.obj["name"]}) in policy {policy_id}'
                 LOGGER.info(msg)
                 index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
                 click.echo(f"[*] {msg}")
-                set_policy_rule_state(ctx, policy_id, rule_id, operation="ACTIVATE")
+                rule.change_state(ctx, policy_id, operation="ACTIVATE")
 
         else:
-            click.echo(f'[*] Rule status is {rule["status"]}')
+            click.echo(f'[*] Rule status is {rule.obj["status"]}')
