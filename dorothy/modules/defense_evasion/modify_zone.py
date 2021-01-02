@@ -47,6 +47,12 @@ def modify_zone(ctx):
     This module renames the specified network zone and then reverts the change. This basic operation is enough for
     defenders to test their ability to monitor for and detect unexpected changes to Okta network zones."""
 
+    # Change prompt depending on name of parent shell
+    if ctx.parent.command.name == "impact":
+        ctx.command.shell.prompt = "dorothy > impact > modify-zone > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > modify-zone > "
+
 
 @modify_zone.command()
 def info():
@@ -86,8 +92,8 @@ def execute(ctx):
     zone = ctx.obj.okta.get_zone(ctx, zone_id)
 
     if zone:
-        original_name = zone["name"]
-        new_name = f'{zone["name"]} TEMP_STRING'
+        original_name = zone.obj["name"]
+        new_name = f'{zone.obj["name"]} TEMP_STRING'
 
         # Rename the zone
         rename_zone(ctx, zone, original_name, new_name)
@@ -108,12 +114,17 @@ def rename_zone(ctx, zone, original_name, new_name):
 
     params = {}
     # Values for "type" and "name" and "gateways" OR "proxies are required when updating a network zone object
-    payload = {"type": zone["type"], "name": new_name, "gateways": zone.get("gateways"), "proxies": zone.get("proxies")}
+    payload = {
+        "type": zone.obj["type"],
+        "name": new_name,
+        "gateways": zone.obj.get("gateways"),
+        "proxies": zone.obj.get("proxies"),
+    }
 
-    url = f'{ctx.obj.base_url}/zones/{zone["id"]}'
+    url = f'{ctx.obj.base_url}/zones/{zone.obj["id"]}'
 
     try:
-        msg = f'Attempting to rename network zone "{original_name}" ({zone["id"]}) to "{new_name}"'
+        msg = f'Attempting to rename network zone "{original_name}" ({zone.obj["id"]}) to "{new_name}"'
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.echo(f"[*] {msg}")
@@ -125,16 +136,16 @@ def rename_zone(ctx, zone, original_name, new_name):
         response = None
 
     if response.ok:
-        msg = f'Network zone "{original_name}" ({zone["id"]}) changed to "{new_name}"'
+        msg = f'Network zone "{original_name}" ({zone.obj["id"]}) changed to "{new_name}"'
         LOGGER.info(msg)
         index_event(ctx.obj.es, module=__name__, event_type="INFO", event=msg)
         click.secho(f"[*] {msg}", fg="green")
-        ctx.obj.okta.get_zone(ctx, zone["id"])
+        ctx.obj.okta.get_zone(ctx, zone.obj["id"])
         time.sleep(1)
 
     else:
         msg = (
-            f'Error modifying network zone {zone["id"]}\n'
+            f'Error modifying network zone {zone.obj["id"]}\n'
             f"    Response Code: {response.status_code} | Response Reason: {response.reason}\n"
             f'    Error Code: {response.json().get("errorCode")} | Error Summary: {response.json().get("errorSummary")}'
         )

@@ -51,6 +51,8 @@ def modify_policy(ctx):
     # Change prompt depending on name of parent shell
     if ctx.parent.command.name == "impact":
         ctx.command.shell.prompt = "dorothy > impact > modify-policy > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > modify-policy > "
 
 
 @modify_policy.command()

@@ -42,6 +42,12 @@ MODULE = Module(MODULE_OPTIONS)
 def change_zone_state(ctx):
     """Deactivate or activate an Okta network zone"""
 
+    # Change prompt depending on name of parent shell
+    if ctx.parent.command.name == "impact":
+        ctx.command.shell.prompt = "dorothy > impact > change-zone-state > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > change-zone-state > "
+
 
 @change_zone_state.command()
 def info():

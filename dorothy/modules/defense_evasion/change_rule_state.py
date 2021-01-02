@@ -49,6 +49,8 @@ def change_rule_state(ctx):
     # Change prompt depending on name of parent shell
     if ctx.parent.command.name == "impact":
         ctx.command.shell.prompt = "dorothy > impact > change-rule-state > "
+    else:
+        ctx.command.shell.prompt = "dorothy > defense-evasion > change-rule-state > "
 
 
 @change_rule_state.command()
