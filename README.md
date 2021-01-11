@@ -9,7 +9,7 @@ Created by David French ([@threatpunter](https://twitter.com/threatpunter)) at [
 
 Dorothy is a tool to help security teams test their monitoring and detection capabilities for their Okta environment. Dorothy has several modules to simulate actions that an attacker might take while operating in an Okta environment and actions that security teams should be able to audit. The modules are mapped to the relevant [MITRE ATT&CK®](https://attack.mitre.org/) tactics, such as persistence, defense evasion, and discovery.
 
-Learn more about Dorothy and how to get started with it in [this blog post](https://www.elastic.co/blog/testing-okta-visibility-and-detection-dorothy).
+Learn more about Dorothy and how to get started with it in [this blog post](https://www.elastic.co/blog/testing-okta-visibility-and-detection-dorothy) or [this presentation](https://youtu.be/IG76PVvQSHE).
 
 [Elastic Security's](https://www.elastic.co/security) free detection rules for Okta can be found in our [detection-rules](https://github.com/elastic/detection-rules) repo. You can read [this blog post](https://www.elastic.co/blog/cloud-monitoring-and-detection-with-elastic-security) to learn more about how Elastic Security helps with cloud monitoring and detection.
 
