@@ -106,7 +106,7 @@ class ClickSubShell(ClickShell):
         return ClickShell.precmd(self, line)
 
     def postcmd(self, stop: bool, line: str) -> bool:
-        """"Execute a single command and return whether the loop should exit."""
+        """Execute a single command and return whether the loop should exit."""
         return ClickShell.postcmd(self, stop, line) or ClickSubShell.pending_main or ClickSubShell.pending_exit
 
     def show_navigation_commands(self):
