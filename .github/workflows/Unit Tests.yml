@@ -38,7 +38,7 @@ jobs:
       run: |
         # Black will return an error if it finds formatting issues
         python -m black dorothy --line-length 120 --check
-    - name: Run pip-audit to scan requirements.txt for packages with known vulnerabilities
+    - name: Run pip-audit to scan packages in requirements.txt for known vulnerabilities
       run: |
         # pip-audit will return exit code 0 if no vulnerabilities are found
         python -m pip-audit --requirement requirements.txt
