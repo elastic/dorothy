@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest black
+        pip install flake8 pytest black pip-audit
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
@@ -38,6 +38,10 @@ jobs:
       run: |
         # Black will return an error if it finds formatting issues
         python -m black dorothy --line-length 120 --check
+    - name: Run pip-audit to scan requirements.txt for packages with known vulnerabilities
+      run: |
+        # pip-audit will return exit code 0 if no vulnerabilities are found
+        python -m pip-audit --requirement requirements.txt
     - name: Start Dorothy
       run: |
         # Check if Dorothy can start without exceptions
