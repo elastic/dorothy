@@ -41,7 +41,7 @@ jobs:
     - name: Run pip-audit to scan packages in requirements.txt for known vulnerabilities
       run: |
         # pip-audit will return exit code 0 if no vulnerabilities are found
-        pip-audit --requirement requirements.txt
+        if pip-audit --requirement requirements.txt; then echo "No vulnerabilities found by pip-audit"; else echo "WARNING: pip-audit found vulnerabilities in Python packages"; fi
     - name: Start Dorothy
       run: |
         # Check if Dorothy can start without exceptions
