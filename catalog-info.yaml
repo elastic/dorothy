@@ -1,0 +1,18 @@
+# Declare a Backstage Component that represents your application.
+---
+# yaml-language-server: $schema=https://json.schemastore.org/catalog-info.json
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: dorothy
+  description: Dorothy is a tool to test security monitoring and detection for Okta environments
+  annotations:
+    backstage.io/source-location: "url:https://github.com/elastic/dorothy/"
+    github.com/project-slug: "elastic/dorothy"
+    github.com/team-slug: "elastic/threat-research-and-detection-engineering"
+    buildkite.com/project-slug: "elastic/dorothy"
+
+spec:
+  type: service
+  owner: group:threat-research-and-detection-engineering
+  lifecycle: production
