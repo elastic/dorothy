@@ -2,7 +2,7 @@ PyYAML~=5.4.1
 click~=7.1.2
 requests~=2.24.0
 tabulate~=0.8.7
-setuptools~=50.3.2
+setuptools~=81.0.0
 click_shell~=2.0
 elasticsearch~=7.10.0
 colorama~=0.4.4; platform_system == "Windows"
